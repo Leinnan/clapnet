@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+      <TargetFramework>netstandard2.0</TargetFramework>
+      <IsPackable>true</IsPackable>
+      <ImplicitUsings>enable</ImplicitUsings>
+      <Nullable>enable</Nullable>
+      <LangVersion>11</LangVersion>
+  </PropertyGroup>
+<PropertyGroup>
+    <PackageId>clapnet</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>MevLyshkin</Authors>
+    <PackageReadmeFile>../README.md</PackageReadmeFile>
+</PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="System.CommandLine" Version="2.0.0-rc.2.25502.107" />
+    </ItemGroup>
+</Project>
