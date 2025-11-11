@@ -9,19 +9,25 @@ Small helper library that provides a simple way to use `System.CommandLine` by j
 
 It works great with the newly introduced dotnet scripts. More about the scripts [here](https://devblogs.microsoft.com/dotnet/announcing-dotnet-run-app/).
 
+Logic for how the library turns a function into a command is straightforward:
+- each basic type (e.g. bool, string, int) parameter is turned into an argument
+- each class parameter is turned into bunch of options, where each field is turned into an option. Default values from class declaration are respected.
+- if return type is `int` then the command will return the value of the function. Otherwise, it will return 0.
+
 ### Small example
 
 This is a valid program that can be run from the command line:
+
 ```csharp
 #!/usr/bin/env dotnet run
-#:package clapnet@0.1.*
+#:package clapnet@0.2.*
 
 return clapnet.CommandBuilder.New()
     .WithRootCommand(()=> Console.WriteLine("Hello world"), "Small program")
     .Run(args);
 ```
 
-### More feature rich example
+### More feature-rich example
 
 Example with extra settings and more commands:
 
@@ -31,7 +37,6 @@ Example with extra settings and more commands:
 
 var builder = clapnet.CommandBuilder.New();
 return builder
-    .WithSettings<SomeSettings>()
     .With(()=> Console.WriteLine("ssss"), "", "lambda_two")
     .With(Gather, "Documentation for gather command")
     .With(Failing, "This command will fail")
@@ -39,9 +44,9 @@ return builder
     .WithRootCommand(Other, "Super command to show what can be done")
     .Run(args);
 
-void Gather(string test = "some", bool assert = false)
+void Gather(SomeSettings settings, string test2 = "some", bool assert = false)
 {
-    Console.WriteLine("Hello World, argument test: {0}", test);
+    Console.WriteLine("Hello World argument test: {0}", test2);
 }
 
 void Other(SomeSettings settings)

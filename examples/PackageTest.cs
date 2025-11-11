@@ -1,9 +1,8 @@
 #!/usr/bin/env dotnet run
-#:package clapnet@0.1.*
+#:package clapnet@0.2.*
 
 var builder = clapnet.CommandBuilder.New();
 return builder
-    .WithSettings<SomeSettings>()
     .With(()=> Console.WriteLine("ssss"), "", "lambda_two")
     .With(Gather, "Documentation for gather command")
     .With(Failing, "This command will fail")

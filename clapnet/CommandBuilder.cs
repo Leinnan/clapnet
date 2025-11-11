@@ -17,7 +17,10 @@ namespace clapnet
     public class CommandBuilder
     {
         private RootCommand _rootCommand = new RootCommand();
-        private readonly Dictionary<Type, Func<ParseResult, object>> _settingsBuilders = new Dictionary<Type, Func<ParseResult, object>>();
+
+        private readonly Dictionary<Type, Func<ParseResult, object>> _settingsBuilders =
+            new Dictionary<Type, Func<ParseResult, object>>();
+
         /// <summary>
         /// Creates a new builder instance
         /// </summary>
@@ -31,56 +34,167 @@ namespace clapnet
             return builder;
         }
 
-        private Func<ParseResult, object>? BuildArgumentForType(FieldInfo field)
+        private Func<ParseResult, object>? BuildArgumentForType(FieldInfo field, ref Command command)
         {
             var fieldName = $"--{field.Name.ToLower()}";
             if (field.FieldType == typeof(string))
             {
                 var option = new Option<string>(fieldName);
 
-                option.Recursive = true;
-                _rootCommand.Add(option);
+                command.Add(option);
                 return result => result.GetValue(option) ?? string.Empty;
-            }else if (field.FieldType == typeof(int))
+            }
+            else if (field.FieldType == typeof(int))
             {
                 var option = new Option<int>(fieldName);
 
-                option.Recursive = true;
-                _rootCommand.Add(option);
+                command.Add(option);
                 return result => result.GetValue(option);
-            } else if (field.FieldType == typeof(bool))
+            }
+            else if (field.FieldType == typeof(bool))
             {
                 var option = new Option<bool>(fieldName);
 
-                option.Recursive = true;
-                _rootCommand.Add(option);
+                command.Add(option);
+                return result => result.GetValue(option);
+            }
+            else if (field.FieldType == typeof(float))
+            {
+                var option = new Option<float>(fieldName);
+
+                command.Add(option);
                 return result => result.GetValue(option);
             }
 
             return null;
         }
 
-        /// <summary>
-        /// Adds extra settings class to the CLI program.
-        /// It will work that way that once a settings class is added, it can be used as a parameter in the added methods.
-        /// The method will get a new object of that class with field overrides based on the passed options to the CLI.
-        /// </summary>
-        /// <returns>Builder</returns>
-        public CommandBuilder WithSettings<T>()
+        private bool TryIntoOption(ParameterInfo parameterInfo, out Func<ParseResult, object>? func, ref Command command)
         {
-            var arguments = new Dictionary<string,Func<ParseResult,object>>();
-            foreach (var field in
-                     typeof(T).GetFields())
+            func = null;
+            var type = parameterInfo.ParameterType;
+            if (type.IsClass)
             {
-                var optionFn = BuildArgumentForType(field);
+                BuildOptionsForType(type, ref command);
+            }
+
+            if (_settingsBuilders.TryGetValue(type, out var f))
+            {
+                func = f;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryIntoArgument(ParameterInfo parameterInfo, out Func<ParseResult, object>? func,
+            out Argument? argument)
+        {
+            func = null;
+            argument = null;
+            if (parameterInfo.ParameterType == typeof(bool))
+            {
+                var def = false;
+                if (parameterInfo.DefaultValue != null)
+                {
+                    def = (bool)parameterInfo.DefaultValue;
+                }
+
+                var boolArgument = new Argument<bool>(parameterInfo.Name);
+                if (parameterInfo.HasDefaultValue)
+                {
+                    boolArgument.DefaultValueFactory = _ => def;
+                }
+
+                argument = boolArgument;
+                func = parse => parse.GetValue(boolArgument);
+            }
+            else if (parameterInfo.ParameterType == typeof(string))
+            {
+                var option = new Argument<string>(parameterInfo.Name);
+                if (parameterInfo.HasDefaultValue)
+                {
+                    option.DefaultValueFactory = _ =>
+                    {
+                        if (parameterInfo.DefaultValue == null)
+                        {
+                            return string.Empty;
+                        }
+
+                        return (string)parameterInfo.DefaultValue;
+                    };
+                }
+
+                argument = option;
+                func = parse => parse.GetValue(option) ?? string.Empty;
+            }
+            else if (parameterInfo.ParameterType == typeof(int))
+            {
+                var option = new Argument<int>(parameterInfo.Name);
+                if (parameterInfo.HasDefaultValue)
+                {
+                    option.DefaultValueFactory = _ => (int)parameterInfo.DefaultValue;
+                }
+
+                argument = option;
+                func = parse => parse.GetValue(option);
+            }
+            else if (parameterInfo.ParameterType == typeof(float))
+            {
+                var option = new Argument<float>(parameterInfo.Name);
+                if (parameterInfo.HasDefaultValue)
+                {
+                    option.DefaultValueFactory = _ => (float)parameterInfo.DefaultValue;
+                }
+
+                argument = option;
+                func = parse => parse.GetValue(option);
+            }
+            else if (parameterInfo.ParameterType == typeof(double))
+            {
+                var option = new Argument<double>(parameterInfo.Name);
+                if (parameterInfo.HasDefaultValue)
+                {
+                    option.DefaultValueFactory = _ => (double)parameterInfo.DefaultValue;
+                }
+
+                argument = option;
+                func = parse => parse.GetValue(option);
+            }
+            else
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private void BuildOptionsForType(Type type, ref Command command)
+        {
+            if (!type.IsClass)
+            {
+                return;
+            }
+
+            var arguments = new Dictionary<string, Func<ParseResult, object>>();
+            foreach (var field in
+                     type.GetFields())
+            {
+                var optionFn = BuildArgumentForType(field, ref command);
                 if (optionFn != null)
                 {
                     arguments.Add(field.Name, optionFn);
                 }
             }
-            _settingsBuilders.Add(typeof(T), result =>
+            // if it already exists, don't do anything.
+            if (_settingsBuilders.ContainsKey(type))
             {
-                var instance = Activator.CreateInstance(typeof(T));
+                return;
+            }
+
+            _settingsBuilders.Add(type, result =>
+            {
+                var instance = Activator.CreateInstance(type);
                 FieldInfo[] ps = instance.GetType().GetFields();
                 foreach (var field in ps)
                 {
@@ -101,14 +215,6 @@ namespace clapnet
 
                 return instance;
             });
-            return this;
-        }
-
-        public CommandBuilder WithOption<T>(string name, string description = "", bool required = false)
-        {
-            var option = new Option<T>(name){Description = description, Required = required, Recursive = true};
-            _rootCommand.Add(option);
-            return this;
         }
 
         private Command BuildCommand(Delegate func, string nameOverride = "")
@@ -119,14 +225,16 @@ namespace clapnet
             {
                 name = nameOverride;
             }
+
             if (name.Contains("|"))
             {
                 name = name.Split('|')[0];
             }
+
             if (name.Contains("__"))
             {
-                var index = name.LastIndexOf("__");
-                name = name.Substring(index+2);
+                var index = name.LastIndexOf("__", StringComparison.Ordinal);
+                name = name.Substring(index + 2);
             }
 
             name = name.ToLowerInvariant();
@@ -134,46 +242,24 @@ namespace clapnet
 
             var parameters = method.GetParameters();
             var isInt = method.ReturnType == typeof(int);
-            var arguments = new List<Func<ParseResult,object>>();
+            var arguments = new List<Func<ParseResult, object>>();
             foreach (var parameterInfo in parameters)
             {
-                if (_settingsBuilders.TryGetValue(parameterInfo.ParameterType, out var f))
+                if (TryIntoArgument(parameterInfo, out var f2, out var argument))
                 {
-                    arguments.Add(f);
+                    cmd.Arguments.Add(argument!);
+                    arguments.Add(f2!);
                 }
-                else if (parameterInfo.ParameterType == typeof(bool))
+                else if (TryIntoOption(parameterInfo, out var f, ref cmd))
                 {
-                    var def = false;
-                    if (parameterInfo.DefaultValue != null)
-                    {
-                        def =(bool)parameterInfo.DefaultValue;
-                    }
-                    var option = new Argument<bool>(parameterInfo.Name);
-                    if (parameterInfo.HasDefaultValue)
-                    {
-                        option.DefaultValueFactory = _ => def;
-                    }
-                    cmd.Arguments.Add(option);
-                    arguments.Add(parse => parse.GetValue(option));
-                } else if (parameterInfo.ParameterType == typeof(string))
-                {
-                    var option = new Argument<string>(parameterInfo.Name);
-                    if (parameterInfo.HasDefaultValue)
-                    {
-                        option.DefaultValueFactory = _ =>
-                        {
-                            if (parameterInfo.DefaultValue == null)
-                            {
-                                return string.Empty;
-                            }
-                            return (string)parameterInfo.DefaultValue;
-                        };
-                    }
-                    cmd.Arguments.Add(option);
-                    arguments.Add(parse => parse.GetValue(option) ?? string.Empty);
+                    arguments.Add(f!);
                 }
-
+                else
+                {
+                    Console.Error.WriteLine($"Unknown parameter: {parameterInfo.Name}");
+                }
             }
+
             cmd.SetAction(result =>
             {
                 var parametersValues = new List<object>();
@@ -189,13 +275,14 @@ namespace clapnet
                         Console.WriteLine("Result is null");
                     }
                 }
+
                 var methodResult = func.DynamicInvoke(parametersValues.ToArray());
 
                 if (isInt && methodResult is int i)
                 {
-                    Console.WriteLine($"Result is int: {i}");
                     return i;
                 }
+
                 return 0;
             });
             return cmd;
@@ -213,12 +300,13 @@ namespace clapnet
             var cmd = BuildCommand(func, name);
             if (!string.IsNullOrEmpty(description))
             {
-                cmd.Description  = description;
+                cmd.Description = description;
             }
 
             _rootCommand.Add(cmd);
             return this;
         }
+
         /// <summary>
         /// Set up the root command for the CLI program
         /// </summary>
@@ -229,51 +317,36 @@ namespace clapnet
         {
             if (!string.IsNullOrEmpty(description))
             {
-                _rootCommand.Description  = description;
+                _rootCommand.Description = description;
             }
+
             var method = func.Method;
             var parameters = method.GetParameters();
             var isInt = method.ReturnType == typeof(int);
-            var arguments = new List<Func<ParseResult,object>>();
+            var arguments = new List<Func<ParseResult, object>>();
             foreach (var parameterInfo in parameters)
             {
-                if (_settingsBuilders.TryGetValue(parameterInfo.ParameterType, out var f))
+                if (TryIntoArgument(parameterInfo, out var f2, out var argument))
                 {
-                    arguments.Add(f);
+                    _rootCommand.Arguments.Add(argument!);
+                    arguments.Add(f2!);
                 }
-                else if (parameterInfo.ParameterType == typeof(bool))
+                else
                 {
-                    var def = false;
-                    if (parameterInfo.DefaultValue != null)
+                    var rootCommand = _rootCommand as Command;
+                    if (TryIntoOption(parameterInfo,
+                            out var f,
+                            ref rootCommand))
                     {
-                        def =(bool)parameterInfo.DefaultValue;
+                        arguments.Add(f!);
                     }
-                    var option = new Argument<bool>(parameterInfo.Name);
-                    if (parameterInfo.HasDefaultValue)
+                    else
                     {
-                        option.DefaultValueFactory = _ => def;
+                        Console.Error.WriteLine($"Unknown parameter: {parameterInfo.Name}");
                     }
-                    _rootCommand.Arguments.Add(option);
-                    arguments.Add(parse => parse.GetValue(option));
-                } else if (parameterInfo.ParameterType == typeof(string))
-                {
-                    var option = new Argument<string>(parameterInfo.Name);
-                    if (parameterInfo.HasDefaultValue)
-                    {
-                        option.DefaultValueFactory = _ =>
-                        {
-                            if (parameterInfo.DefaultValue == null)
-                            {
-                                return string.Empty;
-                            }
-                            return (string)parameterInfo.DefaultValue;
-                        };
-                    }
-                    _rootCommand.Arguments.Add(option);
-                    arguments.Add(parse => parse.GetValue(option) ?? string.Empty);
                 }
-
             }
+
             _rootCommand.SetAction(result =>
             {
                 var parametersValues = new List<object>();
@@ -289,6 +362,7 @@ namespace clapnet
                         Console.WriteLine("Result is null");
                     }
                 }
+
                 var methodResult = func.DynamicInvoke(parametersValues.ToArray());
 
                 if (isInt && methodResult is int i)
@@ -296,10 +370,12 @@ namespace clapnet
                     Console.WriteLine($"Result is int: {i}");
                     return i;
                 }
+
                 return 0;
             });
             return this;
         }
+
         /// <summary>
         /// Runs the CLI
         /// </summary>

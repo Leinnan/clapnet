@@ -3,7 +3,6 @@
 
 var builder = clapnet.CommandBuilder.New();
 return builder
-    .WithSettings<SomeSettings>()
     .With(()=> Console.WriteLine("ssss"), "", "lambda_two")
     .With(Gather, "Documentation for gather command")
     .With(Failing, "This command will fail")
@@ -11,9 +10,9 @@ return builder
     .WithRootCommand(Other, "Super command to show what can be done")
     .Run(args);
 
-void Gather(string test = "some", bool assert = false)
+void Gather(SomeSettings settings, string test2 = "some", bool assert = false)
 {
-    Console.WriteLine("Hello World, argument test: {0}", test);
+    Console.WriteLine("Hello World argument test: {0}", test2);
 }
 
 void Other(SomeSettings settings)
