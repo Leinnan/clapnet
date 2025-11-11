@@ -9,7 +9,22 @@ Small helper library that provides a simple way to use `System.CommandLine` by j
 
 It works great with the newly introduced dotnet scripts. More about the scripts [here](https://devblogs.microsoft.com/dotnet/announcing-dotnet-run-app/).
 
-Example usage:
+### Small example
+
+This is a valid program that can be run from the command line:
+```csharp
+#!/usr/bin/env dotnet run
+#:package clapnet@0.1.*
+
+return clapnet.CommandBuilder.New()
+    .WithRootCommand(()=> Console.WriteLine("Hello world"), "Small program")
+    .Run(args);
+```
+
+### More feature rich example
+
+Example with extra settings and more commands:
+
 ```csharp
 #!/usr/bin/env dotnet run
 #:project clapnet@0.1.*
