@@ -1,5 +1,8 @@
 # clapnet
 
+[![Version](https://img.shields.io/nuget/v/clapnet.svg)](https://nuget.org/packages/clapnet)
+[![Downloads](https://img.shields.io/nuget/dt/clapnet.svg)](https://nuget.org/packages/clapnet)
+
 Small helper library that provides a simple way to use `System.CommandLine` by just passing a bunch of functions into a builder and creating a command line application.
 
 ## Usage
@@ -9,7 +12,7 @@ It works great with the newly introduced dotnet scripts. More about the scripts 
 Example usage:
 ```csharp
 #!/usr/bin/env dotnet run
-#:project clapnet@0.1.0
+#:project clapnet@0.1.*
 
 var builder = clapnet.CommandBuilder.New();
 return builder

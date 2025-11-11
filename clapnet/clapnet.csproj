@@ -9,10 +9,13 @@
   </PropertyGroup>
 <PropertyGroup>
     <PackageId>clapnet</PackageId>
-    <Version>0.1.1</Version>
+    <Version>0.1.2</Version>
     <Authors>MevLyshkin</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/Leinnan/clapnet</RepositoryUrl>
+    <PackageTags>cli commandline console development script</PackageTags>
 </PropertyGroup>
 
   <ItemGroup>

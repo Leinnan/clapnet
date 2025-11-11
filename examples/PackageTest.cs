@@ -1,5 +1,5 @@
 #!/usr/bin/env dotnet run
-#:package clapnet@0.1.0
+#:package clapnet@0.1.*
 
 var builder = clapnet.CommandBuilder.New();
 return builder
