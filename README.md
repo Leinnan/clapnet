@@ -33,7 +33,7 @@ Example with extra settings and more commands:
 
 ```cs
 #!/usr/bin/env dotnet run
-#:project clapnet@0.1.*
+#:project clapnet@0.2.*
 
 var builder = clapnet.CommandBuilder.New();
 return builder
