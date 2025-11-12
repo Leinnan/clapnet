@@ -2,5 +2,5 @@
 #:package clapnet@0.2.*
 
 return clapnet.CommandBuilder.New()
-    .WithRootCommand(()=> Console.WriteLine("Hello world"), "Small program")
+    .WithRootCommand((double argument = 1.0) => Console.WriteLine($"Twice: {argument * 2.0}"), "Small program")
     .Run(args);

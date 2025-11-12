@@ -18,7 +18,7 @@ Logic for how the library turns a function into a command is straightforward:
 
 This is a valid program that can be run from the command line:
 
-```csharp
+```cs
 #!/usr/bin/env dotnet run
 #:package clapnet@0.2.*
 
@@ -31,7 +31,7 @@ return clapnet.CommandBuilder.New()
 
 Example with extra settings and more commands:
 
-```csharp
+```cs
 #!/usr/bin/env dotnet run
 #:project clapnet@0.1.*
 
