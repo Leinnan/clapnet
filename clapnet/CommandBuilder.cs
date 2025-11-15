@@ -367,7 +367,6 @@ namespace clapnet
 
                 if (isInt && methodResult is int i)
                 {
-                    Console.WriteLine($"Result is int: {i}");
                     return i;
                 }
 
