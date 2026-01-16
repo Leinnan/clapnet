@@ -2,10 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.CommandLine;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using Command = System.CommandLine.Command;
 
 namespace clapnet
 {
+    enum CaseType
+    {
+        CamelCase,
+        SnakeCase
+    }
     /// <summary>
     /// Class that makes it easy to create CLI program by just passing methods to a builder
     /// </summary>
@@ -17,6 +23,7 @@ namespace clapnet
     public class CommandBuilder
     {
         private RootCommand _rootCommand = new RootCommand();
+        private CaseType _caseType = CaseType.SnakeCase;
 
         private readonly Dictionary<Type, Func<ParseResult, object>> _settingsBuilders =
             new Dictionary<Type, Func<ParseResult, object>>();
@@ -34,9 +41,42 @@ namespace clapnet
             return builder;
         }
 
-        private Func<ParseResult, object>? BuildArgumentForType(FieldInfo field, ref Command command)
+        /// <summary>
+        /// Use snake case for options.
+        /// </summary>
+        public CommandBuilder UseSnakeCase()
         {
-            var fieldName = $"--{field.Name.ToLower()}";
+            _caseType = CaseType.SnakeCase;
+            return this;
+        }
+
+        /// <summary>
+        /// Use lower camel case for options.
+        /// </summary>
+        public CommandBuilder UseCamelCase()
+        {
+            _caseType = CaseType.CamelCase;
+            return this;
+        }
+
+        private string ParseField(string fieldName)
+        {
+            var result = fieldName;
+            switch (_caseType)
+            {
+                case CaseType.CamelCase:
+                    result = ToLowerCamelCase(fieldName);
+                    break;
+                case CaseType.SnakeCase:
+                    result = ToSnakeCase(fieldName);
+                    break;
+            }
+            return result;
+        }
+
+        private Func<ParseResult, object>? BuildArgumentForType(FieldInfo field, string argumentName, ref Command command)
+        {
+            var fieldName = $"--{argumentName}";
             if (field.FieldType == typeof(string))
             {
                 var option = new Option<string>(fieldName);
@@ -180,10 +220,11 @@ namespace clapnet
             foreach (var field in
                      type.GetFields())
             {
-                var optionFn = BuildArgumentForType(field, ref command);
+                var fieldName = ParseField(field.Name);
+                var optionFn = BuildArgumentForType(field, fieldName, ref command);
                 if (optionFn != null)
                 {
-                    arguments.Add(field.Name, optionFn);
+                    arguments.Add(fieldName, optionFn);
                 }
             }
             // if it already exists, don't do anything.
@@ -202,7 +243,8 @@ namespace clapnet
                     var p = instance.GetType().GetField(field.Name);
                     if (o != null)
                     {
-                        if (arguments.TryGetValue(field.Name, out Func<ParseResult, object> f))
+                        var name = ParseField(field.Name);
+                        if (arguments.TryGetValue(name, out Func<ParseResult, object> f))
                         {
                             var newValue = f(result);
                             if (newValue != null)
@@ -384,6 +426,33 @@ namespace clapnet
         {
             ParseResult parseResult = _rootCommand.Parse(args);
             return parseResult.Invoke();
+        }
+
+        static string ToSnakeCase(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            // 1. Handle the abbreviation case (e.g. IOStream -> IO_Stream)
+            // 2. Handle the standard case (e.g. MyVariable -> My_Variable)
+            var result = Regex.Replace(text, "([a-z0-9])([A-Z])", "$1_$2");
+
+            return result.ToLower();
+        }
+
+        static string ToLowerCamelCase(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            var output = Regex.Replace(text, "_([a-z])", m => m.Groups[1].Value.ToUpper());
+            if (output.Length > 0)
+            {
+                return char.ToLowerInvariant(output[0]) + output.Substring(1);
+            }
+
+            return output;
         }
     }
 }

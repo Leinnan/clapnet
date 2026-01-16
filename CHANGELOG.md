@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+
+- support for specifiyng how options should be formatted(snake case or camel case)
+
 ## 0.2.0
 
 ### Removed

@@ -3,10 +3,11 @@
 
 var builder = clapnet.CommandBuilder.New();
 return builder
-    .With(()=> Console.WriteLine("ssss"), "", "lambda_two")
+    .UseCamelCase()
+    .With(() => Console.WriteLine("ssss"), "", "lambda_two")
     .With(Gather, "Documentation for gather command")
     .With(Failing, "This command will fail")
-    .With(()=> Console.WriteLine("ssss"),"Test command", "lambda")
+    .With(() => Console.WriteLine("ssss"), "Test command", "lambda")
     .WithRootCommand(Other, "Super command to show what can be done")
     .Run(args);
 
@@ -37,4 +38,5 @@ class SomeSettings
     /// Test value, it will be possible to set its value by passing `--other "string value"`.
     /// </summary>
     public string other = "Default Value";
+
 }
