@@ -9,7 +9,7 @@
   </PropertyGroup>
 <PropertyGroup>
     <PackageId>clapnet</PackageId>
-    <Version>0.2.2</Version>
+    <Version>0.3.0</Version>
     <Authors>MevLyshkin</Authors>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>

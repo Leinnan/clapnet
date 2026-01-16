@@ -33,14 +33,15 @@ Example with extra settings and more commands:
 
 ```cs
 #!/usr/bin/env dotnet run
-#:package clapnet@0.2.*
+#:package clapnet@0.3.*
 
 var builder = clapnet.CommandBuilder.New();
 return builder
-    .With(()=> Console.WriteLine("ssss"), "", "lambda_two")
+    .UseCamelCase()
+    .With(() => Console.WriteLine("ssss"), "Other function to call", "lambda_two")
     .With(Gather, "Documentation for gather command")
-    .With(Failing, "This command will fail")
-    .With(()=> Console.WriteLine("ssss"),"Test command", "lambda")
+    .With(Failing)
+    .With(() => Console.WriteLine("ssss"), "Test command", "lambda")
     .WithRootCommand(Other, "Super command to show what can be done")
     .Run(args);
 
@@ -54,7 +55,9 @@ void Other(SomeSettings settings)
     Console.WriteLine("Hello World from the root command");
     Console.WriteLine("Hello World from the root command");
 }
-
+/// <summary>
+/// This command will fail
+/// </summary>
 int Failing()
 {
     /// Returning non zero value
@@ -64,14 +67,15 @@ int Failing()
 class SomeSettings
 {
     /// <summary>
-    /// Test value, it will be possible to set its value by passing `--test true/false`.
+    /// Test value, first one.
     /// </summary>
-    public bool Test = false;
+    public bool TestV = false;
     /// <summary>
-    /// Test value, it will be possible to set its value by passing `--other "string value"`.
+    /// Test value.
     /// </summary>
     public string other = "Default Value";
 }
+
 ```
 
 Now when called from the CLI it will print out:

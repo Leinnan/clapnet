@@ -1,12 +1,12 @@
 #!/usr/bin/env dotnet run
-#:package clapnet@0.2.*
+#:package clapnet@0.3.*
 
 var builder = clapnet.CommandBuilder.New();
 return builder
-    .With(()=> Console.WriteLine("ssss"), "", "lambda_two")
+    .With(() => Console.WriteLine("ssss"), "", "lambda_two")
     .With(Gather, "Documentation for gather command")
     .With(Failing, "This command will fail")
-    .With(()=> Console.WriteLine("ssss"),"Test command", "lambda")
+    .With(() => Console.WriteLine("ssss"), "Test command", "lambda")
     .WithRootCommand(Other, "Super command to show what can be done")
     .Run(args);
 

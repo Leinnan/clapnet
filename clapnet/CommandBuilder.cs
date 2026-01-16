@@ -353,9 +353,17 @@ namespace clapnet
         public CommandBuilder With(Delegate func, string description = "", string name = "")
         {
             var cmd = BuildCommand(func, name);
-            if (!string.IsNullOrEmpty(description))
+            if (!string.IsNullOrWhiteSpace(description))
             {
                 cmd.Description = description;
+            }
+            else
+            {
+                string? desc = DocumentationReader.GetDescription(func.Method);
+                if (!string.IsNullOrEmpty(desc))
+                {
+                    cmd.Description = desc;
+                }
             }
 
             _rootCommand.Add(cmd);
@@ -498,7 +506,7 @@ namespace clapnet
                     }
                 }
             }
-            
+
             return GetSourceDescription(member);
         }
 
@@ -506,7 +514,7 @@ namespace clapnet
         {
             var member = parameter.Member;
             var doc = GetXmlDoc(member);
-            
+
             if (doc != null)
             {
                 string memberId = GetMemberId(member);
@@ -525,8 +533,7 @@ namespace clapnet
                 }
             }
 
-            // Fallback for parameters from source not implemented yet as it requires parsing method signatures
-            return null; 
+            return GetSourceParameterDescription(parameter);
         }
 
         private static XDocument? GetXmlDoc(MemberInfo member)
@@ -544,51 +551,94 @@ namespace clapnet
 
         private static string? GetSourceDescription(MemberInfo member)
         {
+            var result = FindMemberInSource(member);
+            if (result.HasValue)
+            {
+                var xml = ExtractCommentXml(result.Value.lines, result.Value.index);
+                return xml?.Element("summary")?.Value.Trim();
+            }
+            return null;
+        }
+
+        private static string? GetSourceParameterDescription(ParameterInfo parameter)
+        {
+            var result = FindMemberInSource(parameter.Member);
+            if (result.HasValue)
+            {
+                var xml = ExtractCommentXml(result.Value.lines, result.Value.index);
+                if (xml != null)
+                {
+                     var paramElement = xml.Elements("param")
+                        .FirstOrDefault(e => e.Attribute("name")?.Value == parameter.Name);
+                     return paramElement?.Value.Trim();
+                }
+            }
+            return null;
+        }
+
+        private static (string[] lines, int index)? FindMemberInSource(MemberInfo member)
+        {
             var type = member.DeclaringType;
             if (type == null) return null;
 
             // Simple heuristic: find .cs files in current directory
-            try 
+            try
             {
                 var files = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.cs", SearchOption.AllDirectories);
                 foreach (var file in files)
                 {
                     var lines = GetFileLines(file);
-                    // Check if type is defined in this file (simple check)
-                    bool hasType = lines.Any(l => Regex.IsMatch(l, $@"\b(class|struct)\s+{type.Name}\b"));
-                    
+
+                    // Check if type is defined in this file
+                    bool isScriptOrProgram = type.Name == "Program" || type.Name.StartsWith("<");
+                    bool hasType = isScriptOrProgram || lines.Any(l => Regex.IsMatch(l, $@"\b(class|struct)\s+{type.Name}\b"));
+
                     if (hasType)
                     {
-                        // Try to find the member definition
-                        // Regex to match: [modifiers] Type Name [= value];
-                        // We construct a regex that looks for the member name as a word boundary,
-                        // preceded by potential type/modifiers, and followed by assignment or semicolon.
-                        var pattern = $@"\s+{member.Name}\s*(=|;)";
-                        
+                        // Clean up member name if it's a local function
+                        string memberName = member.Name;
+                        var match = Regex.Match(memberName, @">g__(.+)\|");
+                        if (match.Success)
+                        {
+                            memberName = match.Groups[1].Value;
+                        }
+
+                        // Construct regex based on member type
+                        string pattern;
+                        if (member is FieldInfo)
+                        {
+                             // Field: Type Name = ...; or Type Name;
+                             pattern = $@"\s+{memberName}\s*(=|;)";
+                        }
+                        else if (member is MethodInfo)
+                        {
+                            // Method: ReturnType Name(...)
+                            pattern = $@"\s+{memberName}\s*\(";
+                        }
+                        else
+                        {
+                            continue;
+                        }
+
                         for (int i = 0; i < lines.Length; i++)
                         {
                             if (Regex.IsMatch(lines[i], pattern))
                             {
-                                // Found potential match. Check if it has documentation above.
-                                var docs = ExtractDocs(lines, i);
-                                if (docs != null) 
-                                {
-                                     return docs;
-                                }
+                                return (lines, i);
                             }
                         }
                     }
                 }
             }
-            catch 
+            catch
             {
                 // Ignore IO errors
             }
-            
+
             return null;
         }
 
-        private static string? ExtractDocs(string[] lines, int lineIndex)
+        private static XElement? ExtractCommentXml(string[] lines, int lineIndex)
         {
             var comments = new List<string>();
             for (int i = lineIndex - 1; i >= 0; i--)
@@ -606,11 +656,11 @@ namespace clapnet
 
             if (comments.Count > 0)
             {
+                // Wrap in root element to allow multiple elements (summary, param, etc.)
                 var fullXml = "<root>" + string.Join(Environment.NewLine, comments) + "</root>";
-                try 
+                try
                 {
-                    var xdoc = XDocument.Parse(fullXml);
-                    return xdoc.Descendants("summary").FirstOrDefault()?.Value.Trim();
+                    return XDocument.Parse(fullXml).Root;
                 }
                 catch
                 {
