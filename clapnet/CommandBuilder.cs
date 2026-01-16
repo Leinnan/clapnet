@@ -1,8 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.CommandLine;
+using System.IO;
+using System.Linq;
 using System.Reflection;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Command = System.CommandLine.Command;
 
 namespace clapnet
@@ -77,30 +80,32 @@ namespace clapnet
         private Func<ParseResult, object>? BuildArgumentForType(FieldInfo field, string argumentName, ref Command command)
         {
             var fieldName = $"--{argumentName}";
+            string description = DocumentationReader.GetDescription(field) ?? "";
+
             if (field.FieldType == typeof(string))
             {
-                var option = new Option<string>(fieldName);
+                var option = new Option<string>(fieldName) { Description = description };
 
                 command.Add(option);
                 return result => result.GetValue(option) ?? string.Empty;
             }
             else if (field.FieldType == typeof(int))
             {
-                var option = new Option<int>(fieldName);
+                var option = new Option<int>(fieldName) { Description = description };
 
                 command.Add(option);
                 return result => result.GetValue(option);
             }
             else if (field.FieldType == typeof(bool))
             {
-                var option = new Option<bool>(fieldName);
+                var option = new Option<bool>(fieldName) { Description = description };
 
                 command.Add(option);
                 return result => result.GetValue(option);
             }
             else if (field.FieldType == typeof(float))
             {
-                var option = new Option<float>(fieldName);
+                var option = new Option<float>(fieldName) { Description = description };
 
                 command.Add(option);
                 return result => result.GetValue(option);
@@ -132,6 +137,8 @@ namespace clapnet
         {
             func = null;
             argument = null;
+            string description = DocumentationReader.GetParameterDescription(parameterInfo) ?? "";
+
             if (parameterInfo.ParameterType == typeof(bool))
             {
                 var def = false;
@@ -140,7 +147,7 @@ namespace clapnet
                     def = (bool)parameterInfo.DefaultValue;
                 }
 
-                var boolArgument = new Argument<bool>(parameterInfo.Name);
+                var boolArgument = new Argument<bool>(parameterInfo.Name) { Description = description };
                 if (parameterInfo.HasDefaultValue)
                 {
                     boolArgument.DefaultValueFactory = _ => def;
@@ -151,7 +158,7 @@ namespace clapnet
             }
             else if (parameterInfo.ParameterType == typeof(string))
             {
-                var option = new Argument<string>(parameterInfo.Name);
+                var option = new Argument<string>(parameterInfo.Name) { Description = description };
                 if (parameterInfo.HasDefaultValue)
                 {
                     option.DefaultValueFactory = _ =>
@@ -170,7 +177,7 @@ namespace clapnet
             }
             else if (parameterInfo.ParameterType == typeof(int))
             {
-                var option = new Argument<int>(parameterInfo.Name);
+                var option = new Argument<int>(parameterInfo.Name) { Description = description };
                 if (parameterInfo.HasDefaultValue)
                 {
                     option.DefaultValueFactory = _ => (int)parameterInfo.DefaultValue;
@@ -181,7 +188,7 @@ namespace clapnet
             }
             else if (parameterInfo.ParameterType == typeof(float))
             {
-                var option = new Argument<float>(parameterInfo.Name);
+                var option = new Argument<float>(parameterInfo.Name) { Description = description };
                 if (parameterInfo.HasDefaultValue)
                 {
                     option.DefaultValueFactory = _ => (float)parameterInfo.DefaultValue;
@@ -192,7 +199,7 @@ namespace clapnet
             }
             else if (parameterInfo.ParameterType == typeof(double))
             {
-                var option = new Argument<double>(parameterInfo.Name);
+                var option = new Argument<double>(parameterInfo.Name) { Description = description };
                 if (parameterInfo.HasDefaultValue)
                 {
                     option.DefaultValueFactory = _ => (double)parameterInfo.DefaultValue;
@@ -282,6 +289,12 @@ namespace clapnet
             name = name.ToLowerInvariant();
             Command cmd = new Command(name);
 
+            string? desc = DocumentationReader.GetDescription(method);
+            if (!string.IsNullOrEmpty(desc))
+            {
+                cmd.Description = desc;
+            }
+
             var parameters = method.GetParameters();
             var isInt = method.ReturnType == typeof(int);
             var arguments = new List<Func<ParseResult, object>>();
@@ -357,12 +370,20 @@ namespace clapnet
         /// <returns></returns>
         public CommandBuilder WithRootCommand(Delegate func, string description = "")
         {
+            var method = func.Method;
             if (!string.IsNullOrEmpty(description))
             {
                 _rootCommand.Description = description;
             }
+            else
+            {
+                string? desc = DocumentationReader.GetDescription(method);
+                if (!string.IsNullOrEmpty(desc))
+                {
+                    _rootCommand.Description = desc;
+                }
+            }
 
-            var method = func.Method;
             var parameters = method.GetParameters();
             var isInt = method.ReturnType == typeof(int);
             var arguments = new List<Func<ParseResult, object>>();
@@ -455,4 +476,200 @@ namespace clapnet
             return output;
         }
     }
+
+    internal static class DocumentationReader
+    {
+        private static readonly Dictionary<Assembly, XDocument?> _cache = new Dictionary<Assembly, XDocument?>();
+        private static readonly Dictionary<string, string[]> _sourceFileCache = new Dictionary<string, string[]>();
+
+        public static string? GetDescription(MemberInfo member)
+        {
+            var doc = GetXmlDoc(member);
+            if (doc != null)
+            {
+                string memberId = GetMemberId(member);
+                if (!string.IsNullOrEmpty(memberId))
+                {
+                    var element = doc.Descendants("member")
+                        .FirstOrDefault(e => e.Attribute("name")?.Value == memberId);
+                    if (element != null)
+                    {
+                        return element.Element("summary")?.Value.Trim();
+                    }
+                }
+            }
+            
+            return GetSourceDescription(member);
+        }
+
+        public static string? GetParameterDescription(ParameterInfo parameter)
+        {
+            var member = parameter.Member;
+            var doc = GetXmlDoc(member);
+            
+            if (doc != null)
+            {
+                string memberId = GetMemberId(member);
+                if (!string.IsNullOrEmpty(memberId))
+                {
+                    var memberElement = doc.Descendants("member")
+                        .FirstOrDefault(e => e.Attribute("name")?.Value == memberId);
+
+                    var paramElement = memberElement?.Elements("param")
+                        .FirstOrDefault(e => e.Attribute("name")?.Value == parameter.Name);
+
+                    if (paramElement != null)
+                    {
+                        return paramElement.Value.Trim();
+                    }
+                }
+            }
+
+            // Fallback for parameters from source not implemented yet as it requires parsing method signatures
+            return null; 
+        }
+
+        private static XDocument? GetXmlDoc(MemberInfo member)
+        {
+            var assembly = member.DeclaringType?.Assembly;
+            if (assembly == null) return null;
+
+            if (!_cache.TryGetValue(assembly, out var doc))
+            {
+                doc = LoadXmlDocumentation(assembly);
+                _cache[assembly] = doc;
+            }
+            return doc;
+        }
+
+        private static string? GetSourceDescription(MemberInfo member)
+        {
+            var type = member.DeclaringType;
+            if (type == null) return null;
+
+            // Simple heuristic: find .cs files in current directory
+            try 
+            {
+                var files = Directory.GetFiles(Directory.GetCurrentDirectory(), "*.cs", SearchOption.AllDirectories);
+                foreach (var file in files)
+                {
+                    var lines = GetFileLines(file);
+                    // Check if type is defined in this file (simple check)
+                    bool hasType = lines.Any(l => Regex.IsMatch(l, $@"\b(class|struct)\s+{type.Name}\b"));
+                    
+                    if (hasType)
+                    {
+                        // Try to find the member definition
+                        // Regex to match: [modifiers] Type Name [= value];
+                        // We construct a regex that looks for the member name as a word boundary,
+                        // preceded by potential type/modifiers, and followed by assignment or semicolon.
+                        var pattern = $@"\s+{member.Name}\s*(=|;)";
+                        
+                        for (int i = 0; i < lines.Length; i++)
+                        {
+                            if (Regex.IsMatch(lines[i], pattern))
+                            {
+                                // Found potential match. Check if it has documentation above.
+                                var docs = ExtractDocs(lines, i);
+                                if (docs != null) 
+                                {
+                                     return docs;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            catch 
+            {
+                // Ignore IO errors
+            }
+            
+            return null;
+        }
+
+        private static string? ExtractDocs(string[] lines, int lineIndex)
+        {
+            var comments = new List<string>();
+            for (int i = lineIndex - 1; i >= 0; i--)
+            {
+                var line = lines[i].Trim();
+                if (line.StartsWith("///"))
+                {
+                    comments.Insert(0, line.Substring(3));
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            if (comments.Count > 0)
+            {
+                var fullXml = "<root>" + string.Join(Environment.NewLine, comments) + "</root>";
+                try 
+                {
+                    var xdoc = XDocument.Parse(fullXml);
+                    return xdoc.Descendants("summary").FirstOrDefault()?.Value.Trim();
+                }
+                catch
+                {
+                    // Malformed XML in comments
+                }
+            }
+            return null;
+        }
+
+        private static string[] GetFileLines(string path)
+        {
+            if (_sourceFileCache.TryGetValue(path, out var lines)) return lines;
+            lines = File.ReadAllLines(path);
+            _sourceFileCache[path] = lines;
+            return lines;
+        }
+
+        private static XDocument? LoadXmlDocumentation(Assembly assembly)
+        {
+            try
+            {
+                var location = assembly.Location;
+                if (string.IsNullOrEmpty(location)) return null;
+
+                var xmlPath = Path.ChangeExtension(location, ".xml");
+                if (File.Exists(xmlPath))
+                {
+                    return XDocument.Load(xmlPath);
+                }
+            }
+            catch
+            {
+                // Ignore errors
+            }
+            return null;
+        }
+
+        private static string GetMemberId(MemberInfo member)
+        {
+            string typeName = member.DeclaringType?.FullName ?? "";
+
+            if (member is FieldInfo field)
+            {
+                return $"F:{typeName}.{field.Name}";
+            }
+
+            if (member is MethodInfo method)
+            {
+                var parameters = method.GetParameters();
+                var paramString = string.Join(",", parameters.Select(p => p.ParameterType.FullName));
+                if (!string.IsNullOrEmpty(paramString))
+                {
+                    paramString = $"({paramString})";
+                }
+                return $"M:{typeName}.{method.Name}{paramString}";
+            }
+
+            return "";
+        }
+    }
+
 }

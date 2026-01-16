@@ -5,6 +5,7 @@
 ### Added
 
 - support for specifiyng how options should be formatted(snake case or camel case)
+- Brute force way of reading comments from source code to populate CLI descriptions.
 
 ## 0.2.0
 
