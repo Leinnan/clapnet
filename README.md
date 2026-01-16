@@ -39,12 +39,17 @@ var builder = clapnet.CommandBuilder.New();
 return builder
     .UseCamelCase()
     .With(() => Console.WriteLine("ssss"), "Other function to call", "lambda_two")
-    .With(Gather, "Documentation for gather command")
+    .With(Gather)
     .With(Failing)
     .With(() => Console.WriteLine("ssss"), "Test command", "lambda")
     .WithRootCommand(Other, "Super command to show what can be done")
     .Run(args);
 
+/// <summary>
+/// Documentation for gather command
+/// </summary>
+/// <param name="test2">extra argument</param>
+/// <param name="assert">other argument</param>
 void Gather(SomeSettings settings, string test2 = "some", bool assert = false)
 {
     Console.WriteLine("Hello World argument test: {0}", test2);
@@ -82,23 +87,23 @@ Now when called from the CLI it will print out:
 
 ```bash
  ./Test.cs -- --help
-Description:
-  Super command to show what can be done
-
-Usage:
-  Test [command] [options]
-
-Options:
-  --test
-  --other <other>
-  -?, -h, --help   Show help and usage information
-  --version        Show version information
-
-Commands:
-  lambda_two
-  gather <test> <assert>  Documentation for gather command [default: some]
-  failing                 This command will fail
-  lambda                  Test command
+ Description:
+   Super command to show what can be done
+ 
+ Usage:
+   Test [command] [options]
+ 
+ Options:
+   --testV          Test value, first one.
+   --other <other>  Test value.
+   -?, -h, --help   Show help and usage information
+   --version        Show version information
+ 
+ Commands:
+   lambda_two               Other function to call
+   gather <test2> <assert>  Documentation for gather command [default: some]
+   failing                  This command will fail
+   lambda                   Test command
 ```
 
 Take a look at the [examples](examples) directory for a simple example of how to use `clapnet`.

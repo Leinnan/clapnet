@@ -360,7 +360,7 @@ namespace clapnet
             else
             {
                 string? desc = DocumentationReader.GetDescription(func.Method);
-                if (!string.IsNullOrEmpty(desc))
+                if (!string.IsNullOrWhiteSpace(desc))
                 {
                     cmd.Description = desc;
                 }
@@ -568,9 +568,9 @@ namespace clapnet
                 var xml = ExtractCommentXml(result.Value.lines, result.Value.index);
                 if (xml != null)
                 {
-                     var paramElement = xml.Elements("param")
-                        .FirstOrDefault(e => e.Attribute("name")?.Value == parameter.Name);
-                     return paramElement?.Value.Trim();
+                    var paramElement = xml.Elements("param")
+                       .FirstOrDefault(e => e.Attribute("name")?.Value == parameter.Name);
+                    return paramElement?.Value.Trim();
                 }
             }
             return null;
@@ -607,8 +607,8 @@ namespace clapnet
                         string pattern;
                         if (member is FieldInfo)
                         {
-                             // Field: Type Name = ...; or Type Name;
-                             pattern = $@"\s+{memberName}\s*(=|;)";
+                            // Field: Type Name = ...; or Type Name;
+                            pattern = $@"\s+{memberName}\s*(=|;)";
                         }
                         else if (member is MethodInfo)
                         {
