@@ -13,7 +13,8 @@ namespace clapnet
     enum CaseType
     {
         CamelCase,
-        SnakeCase
+        SnakeCase,
+        KebabCase,
     }
     /// <summary>
     /// Class that makes it easy to create CLI program by just passing methods to a builder
@@ -62,6 +63,15 @@ namespace clapnet
             return this;
         }
 
+        /// <summary>
+        /// Use kebab case for options.
+        /// </summary>
+        public CommandBuilder UseKebabCase()
+        {
+            _caseType = CaseType.KebabCase;
+            return this;
+        }
+
         private string ParseField(string fieldName)
         {
             var result = fieldName;
@@ -72,6 +82,9 @@ namespace clapnet
                     break;
                 case CaseType.SnakeCase:
                     result = ToSnakeCase(fieldName);
+                    break;
+                case CaseType.KebabCase:
+                    result = ToKebabCase(fieldName);
                     break;
             }
             return result;
@@ -467,6 +480,20 @@ namespace clapnet
             // 1. Handle the abbreviation case (e.g. IOStream -> IO_Stream)
             // 2. Handle the standard case (e.g. MyVariable -> My_Variable)
             var result = Regex.Replace(text, "([a-z0-9])([A-Z])", "$1_$2");
+
+            return result.ToLower();
+        }
+
+        static string ToKebabCase(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+            {
+                return text;
+            }
+
+            // 1. Handle the abbreviation case (e.g. IOStream -> IO-Stream)
+            // 2. Handle the standard case (e.g. MyVariable -> My-Variable)
+            var result = Regex.Replace(text, "([a-z0-9])([A-Z])", "$1-$2");
 
             return result.ToLower();
         }

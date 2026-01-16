@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+### Added
+
+- support for kebab case for options.
+
 ## 0.3.0
 
 ### Added
